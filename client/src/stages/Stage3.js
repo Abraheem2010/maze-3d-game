@@ -7,12 +7,11 @@ import './Stage3.css';
 
 function Stage3() {
   const navigate = useNavigate();
-  const [gameState, setGameState] = useState('INPUT'); // INPUT | COUNTDOWN | PLAYING
+  const [gameState, setGameState] = useState('INPUT'); // INPUT | COUNTDOWN | PLAYING | COMPLETED
   const [playerName, setPlayerName] = useState('');
   const [countdown, setCountdown] = useState(3);
-
-  const [showWinPopup, setShowWinPopup] = useState(false);
-  const [finalTime, setFinalTime] = useState(0);
+  const [finalTime, setFinalTime] = useState(null);
+  const [showWinOverlay, setShowWinOverlay] = useState(false);
 
   useEffect(() => {
     const savedName = localStorage.getItem("playerName");
@@ -21,14 +20,21 @@ function Stage3() {
 
   useEffect(() => {
     if (gameState !== 'COUNTDOWN') return;
-
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
       return () => clearTimeout(timer);
     }
-
     setGameState('PLAYING');
   }, [gameState, countdown]);
+
+  useEffect(() => {
+    if (!showWinOverlay) return;
+    const timer = setTimeout(() => {
+      setShowWinOverlay(false);
+      navigate("/");
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [showWinOverlay, navigate]);
 
   const handleStart = () => {
     const trimmed = playerName.trim();
@@ -40,6 +46,8 @@ function Stage3() {
 
     setCountdown(3);
     setGameState('COUNTDOWN');
+    setShowWinOverlay(false);
+    setFinalTime(null);
   };
 
   const handleWin = (winTime) => {
@@ -51,16 +59,13 @@ function Stage3() {
     const name = (playerName || localStorage.getItem("playerName") || "player").trim();
     const payload = { stage: 3, name, time };
 
-    setFinalTime(time);
-    setShowWinPopup(true);
-
     try { localStorage.setItem("records_dirty", String(Date.now())); } catch (e) {}
 
     postScore(payload);
 
-    setTimeout(() => {
-      navigate("/", { state: { playerName: name } });
-    }, 3000);
+    setFinalTime(time);
+    setGameState('COMPLETED');
+    setShowWinOverlay(true);
   };
 
   return (
@@ -98,41 +103,19 @@ function Stage3() {
         <div className="countdown-overlay">{countdown > 0 ? countdown : "BURN!"}</div>
       )}
 
-      {gameState === 'PLAYING' && (
+      {gameState === 'PLAYING' && !showWinOverlay && (
         <div className="game-active">
           <Maze3 onWin={handleWin} playerName={playerName} />
         </div>
       )}
 
-      {showWinPopup && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 9999
-          }}
-        >
-          <div
-            style={{
-              background: '#222',
-              padding: '20px',
-              borderRadius: '15px',
-              border: '2px solid #ff4500',
-              textAlign: 'center',
-              maxWidth: '90%',
-              width: '320px',
-              boxShadow: '0 0 20px rgba(255, 69, 0, 0.5)',
-              color: 'white'
-            }}
-          >
-            <h2 style={{ color: '#ff4500', margin: '0 0 10px 0' }}>VICTORY!</h2>
-            <p style={{ fontSize: '1.2rem', margin: '10px 0' }}>
-              You made it in <br />
-              <span style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{finalTime}</span> seconds!
+      {showWinOverlay && (
+        <div className="post-win-overlay">
+          <div className="post-win-card stage3-post-win">
+            <h2>Victory!</h2>
+            <p className="post-win-time">
+              Core cleared in
+              <span>{finalTime !== null ? finalTime.toFixed(2) : "0.00"}s</span>
             </p>
           </div>
         </div>

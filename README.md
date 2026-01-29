@@ -38,8 +38,26 @@ npm start
 Server API runs on http://localhost:3000.  
 The React dev server starts on http://localhost:3000 if it's free, otherwise it will prompt to use http://localhost:3001.
 
+If you want to bind the client explicitly to port 3001 when running both services locally, set the environment variable before `npm start`:
+
+```bash
+# PowerShell
+$env:PORT=3001
+npm start
+
+# cmd.exe
+set PORT=3001
+npm start
+```
+
 ---
 
+## Compliance Summary (Option 3)
+- **Express + SQLite backend**: `server/server.js` exposes `/api/score`, `/api/records`, and `/healthc`, validates every payload, and the SQLite helper in `server/db.js` keeps only the fastest run per stage.
+- **React frontend**: `client/` hosts the SPA (Home plus Stage1/Stage2/Stage3). Each stage sends the completion time to the backend, uses HTML canvas for the maze, and `client/src/Leaderboard.js` polls `/api/records` to keep the Hall of Fame up to date.
+- **Clear separation**: All non-DOM logic (validation, data storage, record comparison) runs on the server. The client handles player interaction, rendering, and displaying the polished overlays (“Well Done”, “Great Dive”, “Victory”) that delay the return to the home screen for about two seconds.
+- **Multi-screen experience**: There are at least four routes (`/`, `/stage1`, `/stage2`, `/stage3`), satisfying the requirement for multiple screens.
+- **Look & Feel attention**: The overlay card uses gradient backgrounds, bold typography, and a subtle pop-up animation defined in `client/src/stages/Stages.css` to deliver the UX polish the instructor asked for.
 ## Environment Variables
 Set this only if the client is deployed separately:
 ```

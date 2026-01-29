@@ -7,9 +7,11 @@ import './Stage1.css';
 
 function Stage1() {
   const navigate = useNavigate();
-  const [gameState, setGameState] = useState('INPUT'); // INPUT | COUNTDOWN | PLAYING
+  const [gameState, setGameState] = useState('INPUT'); // INPUT | COUNTDOWN | PLAYING | COMPLETED
   const [playerName, setPlayerName] = useState('');
   const [countdown, setCountdown] = useState(3);
+  const [finalTime, setFinalTime] = useState(null);
+  const [showWinOverlay, setShowWinOverlay] = useState(false);
 
   useEffect(() => {
     if (gameState !== 'COUNTDOWN') return;
@@ -21,6 +23,15 @@ function Stage1() {
 
     setGameState('PLAYING');
   }, [gameState, countdown]);
+
+  useEffect(() => {
+    if (!showWinOverlay) return;
+    const timer = setTimeout(() => {
+      setShowWinOverlay(false);
+      navigate("/");
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [showWinOverlay, navigate]);
 
   const handleStart = () => {
     const trimmed = playerName.trim();
@@ -34,12 +45,14 @@ function Stage1() {
 
     setCountdown(3);
     setGameState('COUNTDOWN');
+    setShowWinOverlay(false);
+    setFinalTime(null);
   };
 
-  const handleWin = (finalTime) => {
+  const handleWin = (finalTimeValue) => {
     const time =
-      (typeof finalTime === "number" && Number.isFinite(finalTime))
-        ? finalTime
+      (typeof finalTimeValue === "number" && Number.isFinite(finalTimeValue))
+        ? finalTimeValue
         : 0;
 
     const name = (playerName || localStorage.getItem("playerName") || "player").trim();
@@ -49,7 +62,9 @@ function Stage1() {
 
     postScore(payload);
 
-    navigate("/stage2", { state: { playerName: name } });
+    setFinalTime(time);
+    setGameState('COMPLETED');
+    setShowWinOverlay(true);
   };
 
   return (
@@ -91,9 +106,21 @@ function Stage1() {
         <div className="countdown-overlay">{countdown}</div>
       )}
 
-      {gameState === 'PLAYING' && (
+      {gameState === 'PLAYING' && !showWinOverlay && (
         <div className="game-active">
           <Maze1 onWin={handleWin} />
+        </div>
+      )}
+
+      {showWinOverlay && (
+        <div className="post-win-overlay">
+          <div className="post-win-card stage1-post-win">
+            <h2>Well Done!</h2>
+            <p className="post-win-time">
+              Level 1 complete in
+              <span>{finalTime !== null ? finalTime.toFixed(2) : "0.00"}s</span>
+            </p>
+          </div>
         </div>
       )}
     </div>
