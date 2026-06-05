@@ -6,31 +6,6 @@ and the server stores only the best (fastest) record per stage.
 
 ---
 
-## Live Demo
-- (Add your deployment link here)
-
----
-
-## Requirements Checklist
-- Express server with a DB (SQLite)
-- Frontend + backend
-- At least 2 screens (Home + Stage 1-3)
-- Non-DOM logic on server (validation + best-record rule)
-
----
-
-## Chosen Submission Option
-Option 3: React client + Express server.
-
----
-
-## Authors
-- ibraheem hassda
-- omer bendr
-- aviv hod
-
----
-
 ## Project Structure
 - client/ - React frontend
 - server/ - Express API + SQLite DB
@@ -99,8 +74,7 @@ It appears on the robot head inside the 3D maze (and is shared with other player
 ---
 
 ## API Endpoints
-Base URL (local server): http://localhost:3000
-Base URL (Render): same as the app link above
+Base URL (local): http://localhost:5000
 
 ### `GET /api/ping`
 Health check.
