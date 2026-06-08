@@ -6,26 +6,130 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 const MODEL_URL = "https://threejs.org/examples/models/gltf/Soldier.glb";
 const USER_FACE_URL = "/face.png";
 
-const WALL_URL =
-  "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/brick_diffuse.jpg";
-const WALL_BUMP_URL =
-  "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/brick_bump.jpg";
-const WALL_ROUGH_URL =
-  "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/brick_roughness.jpg";
-const FLOOR_URL =
-  "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/hardwood2_diffuse.jpg";
-const FLOOR_BUMP_URL =
-  "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/hardwood2_bump.jpg";
+// --- Procedural city textures (drawn on a canvas, no external assets) ---
+function makeCanvasTexture(THREE, size, draw) {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  draw(ctx, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function drawBuildingTexture(ctx, size) {
+  // Concrete gray base — urban building facade
+  ctx.fillStyle = "#808590";
+  ctx.fillRect(0, 0, size, size);
+
+  const panelH = Math.max(36, Math.floor(size / 5));
+  const panelW = Math.max(44, Math.floor(size / 4));
+  const joint = 3;
+
+  for (let py = 0; py < size; py += panelH) {
+    for (let px = 0; px < size; px += panelW) {
+      const shade = (118 + (Math.random() * 22 - 11)) | 0;
+      ctx.fillStyle = `rgb(${shade},${shade + 3},${shade + 8})`;
+      ctx.fillRect(px + joint, py + joint, panelW - joint * 2, panelH - joint * 2);
+
+      const winW = (panelW - joint * 2) * 0.44;
+      const winH = (panelH - joint * 2) * 0.52;
+      const winX = px + joint + (panelW - joint * 2 - winW) / 2;
+      const winY = py + joint + (panelH - joint * 2 - winH) * 0.3;
+
+      if (Math.random() < 0.72) {
+        ctx.fillStyle = "#3a3f48";
+        ctx.fillRect(winX, winY, winW, winH);
+        ctx.fillStyle = Math.random() < 0.35 ? "#c8dff0" : "#111820";
+        ctx.fillRect(winX + 2, winY + 2, winW - 4, winH - 4);
+        ctx.fillStyle = "#3a3f48";
+        ctx.fillRect(winX + winW / 2 - 1, winY, 2, winH);
+        ctx.fillRect(winX, winY + winH / 2 - 1, winW, 2);
+      }
+    }
+  }
+
+  ctx.strokeStyle = "rgba(0,0,0,0.07)";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 14; i++) {
+    const x = Math.random() * size;
+    ctx.beginPath();
+    ctx.moveTo(x, Math.random() * size * 0.4);
+    ctx.lineTo(x + (Math.random() * 8 - 4), size);
+    ctx.stroke();
+  }
+
+  const img = ctx.getImageData(0, 0, size, size);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (Math.random() * 14 - 7) | 0;
+    d[i] = Math.max(0, Math.min(255, d[i] + n));
+    d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
+    d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n));
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function drawAsphaltTexture(ctx, size) {
+  // Dark asphalt base — city street
+  ctx.fillStyle = "#2c2e32";
+  ctx.fillRect(0, 0, size, size);
+
+  for (let i = 0; i < 500; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const r = 0.5 + Math.random() * 2.5;
+    const v = 35 + (Math.random() * 45) | 0;
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Dashed center line
+  ctx.strokeStyle = "#b89600";
+  ctx.lineWidth = Math.max(2, size * 0.025);
+  ctx.setLineDash([size * 0.14, size * 0.1]);
+  ctx.beginPath();
+  ctx.moveTo(size / 2, 0);
+  ctx.lineTo(size / 2, size);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle = "rgba(0,0,0,0.45)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 10; i++) {
+    ctx.beginPath();
+    ctx.moveTo(Math.random() * size, Math.random() * size);
+    ctx.lineTo(Math.random() * size, Math.random() * size);
+    ctx.stroke();
+  }
+
+  const img = ctx.getImageData(0, 0, size, size);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (Math.random() * 14 - 7) | 0;
+    d[i] = Math.max(0, Math.min(255, d[i] + n));
+    d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
+    d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n));
+  }
+  ctx.putImageData(img, 0, 0);
+}
 
 const LEVEL_THEMES = [
   {
     scene: {
-      sky: "#e7c59a",
-      fog: "#e7c59a",
+      sky: "#9aa8b8",
+      fog: "#aab4c2",
       ambient: "#2b3345",
-      hemiSky: "#ffd5a6",
+      hemiSky: "#dde8f2",
       hemiGround: "#283246",
-      sun: "#ffb36a",
+      sun: "#eef2f7",
       goal: "#22c55e",
     },
     ui: {
@@ -70,13 +174,13 @@ const LEVEL_THEMES = [
   },
   {
     scene: {
-      sky: "#d3b29b",
-      fog: "#d3b29b",
+      sky: "#5a6070",
+      fog: "#646e7e",
       ambient: "#2b2128",
-      hemiSky: "#ffd7b3",
+      hemiSky: "#c8d8e8",
       hemiGround: "#2c2430",
-      sun: "#ff9b54",
-      goal: "#f97316",
+      sun: "#aebccf",
+      goal: "#22c55e",
     },
     ui: {
       hud: "#ffd1a8",
@@ -183,6 +287,9 @@ export default function MazeGame() {
   const [elapsed, setElapsed] = useState(0);
   const [locked, setLocked] = useState(false);
   const lockedRef = useRef(false);
+  const [avatarUrl, setAvatarUrl] = useState(() => {
+    try { return localStorage.getItem("robotAvatarUrl") || ""; } catch (e) { return ""; }
+  });
 
   const startTimeRef = useRef(0);
   const elapsedRef = useRef(0);
@@ -352,44 +459,28 @@ export default function MazeGame() {
 
     const loader = new THREE.TextureLoader();
     loader.setCrossOrigin("anonymous");
-    const wallTex = loader.load(WALL_URL);
-    const wallBump = loader.load(WALL_BUMP_URL);
-    const wallRough = loader.load(WALL_ROUGH_URL);
-    const floorTex = loader.load(FLOOR_URL);
-    const floorBump = loader.load(FLOOR_BUMP_URL);
-    const faceTex = loader.load(USER_FACE_URL);
 
-    wallTex.colorSpace = THREE.SRGBColorSpace;
-    floorTex.colorSpace = THREE.SRGBColorSpace;
+    // City walls/streets drawn procedurally (no external downloads).
+    const wallTex = makeCanvasTexture(THREE, 512, drawBuildingTexture);
+    const floorTex = makeCanvasTexture(THREE, 512, drawAsphaltTexture);
+
+    // Player face: uploaded photo (localStorage) if present, else fallback.
+    const faceTex = loader.load(avatarUrl || USER_FACE_URL);
     faceTex.colorSpace = THREE.SRGBColorSpace;
-
-    wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping;
-    wallBump.wrapS = wallBump.wrapT = THREE.RepeatWrapping;
-    wallRough.wrapS = wallRough.wrapT = THREE.RepeatWrapping;
-    floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
-    floorBump.wrapS = floorBump.wrapT = THREE.RepeatWrapping;
 
     const wallRepeat = theme.texture.wallRepeat;
     wallTex.repeat.set(wallRepeat.x, wallRepeat.y);
-    wallBump.repeat.set(wallRepeat.x, wallRepeat.y);
-    wallRough.repeat.set(wallRepeat.x, wallRepeat.y);
     const floorRepeatX = (cols / 4) * theme.texture.floorScale;
     const floorRepeatY = (rows / 4) * theme.texture.floorScale;
     floorTex.repeat.set(floorRepeatX, floorRepeatY);
-    floorBump.repeat.set(floorRepeatX, floorRepeatY);
 
     const wallMat = new THREE.MeshStandardMaterial({
       map: wallTex,
-      bumpMap: wallBump,
-      roughnessMap: wallRough,
-      bumpScale: 0.15,
-      roughness: 0.9,
-      metalness: 0.02,
+      roughness: 0.85,
+      metalness: 0.05,
     });
     const floorMat = new THREE.MeshStandardMaterial({
       map: floorTex,
-      bumpMap: floorBump,
-      bumpScale: 0.2,
       roughness: 0.95,
       metalness: 0.02,
     });
@@ -483,8 +574,8 @@ export default function MazeGame() {
     const baseDir = new THREE.Vector3(0, 0, 1);
     let yaw = 0;
     let pitch = 0.35;
-    const minPitch = 0.05;
-    const maxPitch = 1.1;
+    const minPitch = -0.15;
+    const maxPitch = 1.45;
     const camLerp = 0.08;
     const camMargin = 0.4;
     const minCamDistance = 2.2;
@@ -502,7 +593,7 @@ export default function MazeGame() {
     };
     const onMouseMove = (e) => {
       if (!lockedRef.current) return;
-      const lookSpeed = 0.002;
+      const lookSpeed = 0.0032;
       yaw -= e.movementX * lookSpeed;
       pitch -= e.movementY * lookSpeed;
       pitch = THREE.MathUtils.clamp(pitch, minPitch, maxPitch);
@@ -661,10 +752,10 @@ export default function MazeGame() {
     const forward = new THREE.Vector3();
     const right = new THREE.Vector3();
     const move = new THREE.Vector3();
-    const accel = 26;
-    const damping = 14;
-    const maxSpeed = 6.5;
-    const turnSpeed = 12;
+    const accel = 48;
+    const damping = 12;
+    const maxSpeed = 10;
+    const turnSpeed = 16;
 
     let last = performance.now();
     let lastHud = 0;
@@ -833,10 +924,7 @@ export default function MazeGame() {
       goalMesh.geometry.dispose();
       goalMesh.material.dispose();
       wallTex.dispose();
-      wallBump.dispose();
-      wallRough.dispose();
       floorTex.dispose();
-      floorBump.dispose();
       faceTex.dispose();
       envTex.dispose();
       pmrem.dispose();
@@ -845,7 +933,7 @@ export default function MazeGame() {
     };
 
     return cleanup;
-  }, [levelData, selectedLevel]);
+  }, [levelData, selectedLevel, avatarUrl]);
 
   const startLevel = (level) => {
     if (!unlocked[level - 1]) return;
@@ -855,6 +943,29 @@ export default function MazeGame() {
 
   const returnToMenu = () => {
     setGameState("MENU");
+  };
+
+  const handleFaceUpload = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        // Resize to keep localStorage small.
+        const canvas = document.createElement("canvas");
+        const maxSize = 256;
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        const url = canvas.toDataURL("image/jpeg", 0.85);
+        setAvatarUrl(url);
+        try { localStorage.setItem("robotAvatarUrl", url); } catch (err) {}
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleClick = () => {
@@ -1083,6 +1194,24 @@ export default function MazeGame() {
                 <div className="menu-subtitle">Choose your mission</div>
                 <div className="level-track">{levelCards}</div>
                 <div className="helper-text">WASD to move. Click to lock camera and look around.</div>
+
+                <div style={{ marginTop: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                  {avatarUrl && (
+                    <img
+                      src={avatarUrl}
+                      alt="your face"
+                      style={{ width: 64, height: 64, borderRadius: 12, objectFit: "cover", border: "2px solid var(--panel-border)" }}
+                    />
+                  )}
+                  <label className="menu-button" style={{ cursor: "pointer", display: "inline-block" }}>
+                    {avatarUrl ? "Change Face Photo" : "Upload Face Photo"}
+                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={handleFaceUpload} />
+                  </label>
+                  <div style={{ fontSize: 11, opacity: 0.7 }}>
+                    The photo appears on the character's head.
+                  </div>
+                </div>
+
                 <div className="scoreboard">
                   <h4>Best Records</h4>
                   <table>
