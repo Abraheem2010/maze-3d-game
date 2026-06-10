@@ -4,12 +4,29 @@ const http = require("http");
 const path = require("path");
 const fs = require("fs");
 const { WebSocketServer } = require("ws");
+const rateLimit = require("express-rate-limit");
 const db = require("./db");
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// Behind a single reverse proxy (Railway/Render) — needed for correct client IPs.
+app.set("trust proxy", 1);
+
+// Middleware — restrict CORS to known origins (override via CORS_ORIGIN, comma-separated)
+const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000")
+  .split(",")
+  .map((s) => s.trim());
+app.use(cors({ origin: allowedOrigins }));
+
+// Rate limit the API to curb spam / abuse (60 requests/min per IP)
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please slow down." },
+});
+app.use("/api", apiLimiter);
 
 /* === CONTENT_TYPE_GUARD === */
 app.use("/api/score", (req, res, next) => {
@@ -34,6 +51,7 @@ app.use((err, req, res, next) => {
 
 /* === VALIDATE_SCORE_MW (single source of truth) === */
 const MAX_NAME_LEN = 32;
+const MAX_AVATAR_LEN = 200000; // ~200 KB cap on avatar data URLs (prevents memory/bandwidth abuse)
 
 app.use("/api/score", (req, res, next) => {
   if (req.method !== "POST") return next();
@@ -189,7 +207,10 @@ wss.on("connection", (ws) => {
     if (msg.type === "join") {
       const roomId = String(msg.room || "maze");
       const name = String(msg.name || "Player").slice(0, 32);
-      const avatar = typeof msg.avatar === "string" ? msg.avatar : "";
+      const avatar =
+        typeof msg.avatar === "string" && msg.avatar.length <= MAX_AVATAR_LEN
+          ? msg.avatar
+          : "";
       const stage = Number.isFinite(msg.stage) ? msg.stage : null;
 
       const room = getRoom(roomId);
@@ -251,7 +272,9 @@ wss.on("connection", (ws) => {
 
     if (msg.type === "update") {
       client.name = String(msg.name || client.name || "Player").slice(0, 32);
-      if (typeof msg.avatar === "string") client.avatar = msg.avatar;
+      if (typeof msg.avatar === "string" && msg.avatar.length <= MAX_AVATAR_LEN) {
+        client.avatar = msg.avatar;
+      }
       if (Number.isFinite(msg.stage)) client.stage = msg.stage;
       broadcast(
         room,
